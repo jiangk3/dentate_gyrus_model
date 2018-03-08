@@ -20,8 +20,8 @@ ENa = 55*mV
 EK = -90*mV
 gNa = 35*msiemens
 gK = 52*msiemens
-tausyn = 10*ms
-taugsyn = 50*ms
+tausyn = 2*ms
+taugsyn = 10*ms
 
 eqs = '''
 dv/dt = (-gNa*m**3*h*(v-ENa)-gK*n**4*(v-EK)-gL*(v-EL)+Iapp - Isyn - gIsyn)/Cm : volt
@@ -42,7 +42,7 @@ beta_n = 0.125*exp(-(v+44*mV)/(80*mV))/ms : Hz
 #choose a multiple of 3 please.
 rt = 300
 gap = 10 #2 gaps
-skip = 100
+skip = 200
 total_rt = rt + (gap*2) + skip
 #Experiment: all in one run: A1 - 1000, choose 300, every 5/50? ms diff group of 50 fire.
 #                            A2 -       same 300 "                                      "
@@ -61,9 +61,9 @@ n3.v = -80*mV
 n3.h = 1
 
 #inhibitory group--------------------------------------------------------------
-I = NeuronGroup(100, eqs, method='exponential_euler')
-wa = (600)#inhibitory
-we = (650)#excitatory
+I = NeuronGroup(100, eqs, threshold = 'v > -40*mV', refractory = 'v >= -40*mV',method='exponential_euler')
+wa = (2000)#inhibitory
+we = (2500)#excitatory
 #firing------------------------------------------------------------------------
 #next time: change this to spike generator group. 1000, choose 300, each time, randomly choose 50 of 300 to fire every 5 ms.
 #PG = PoissonGroup(1000, 1*Hz)
@@ -72,17 +72,19 @@ we = (650)#excitatory
 time_break1 = int((rt)/3)
 time_break2 = time_break1 * 2
 #------------------------------A1----------------------------------------------
-ind = list(random.sample(range(0, 1000), 300))
+ind = list(random.sample(range(0, 1000), 100))
+#ind = list(range(0,100))
+
 
 t = []
 temp = []
-for idx in range(0 + skip, time_break1 + skip, 5):
+for idx in range(skip, time_break1 + skip, 5):
     temp = [idx] * 50
     for idx2 in temp:
         t.append(idx2)
 
 ind2 = []
-for idx in range(0 + skip, time_break1 + skip, 5):
+for idx in range(skip, time_break1 + skip, 5):
     temp = random.sample(ind, 50)
     for idx2 in temp:
         ind2.append(idx2)
@@ -102,14 +104,16 @@ for idx in range(time_break1 + gap + skip, time_break2 + gap + skip, 5):
         
 #print('ind2: %s' %len(ind2))
 #------------------------------B1----------------------------------------------
-ind_B1 = list(random.sample(range(0, 1000), 300))
+ind_B1 = list(random.sample(range(0, 1000), 100))
+#ind_B1 = list(range(200,300))
 
-for idx in range(time_break2 + (gap*2) + skip, total_rt + skip, 5):
+
+for idx in range(time_break2 + (gap*2) + skip, total_rt, 5):
     temp = [idx + (gap*2)] * 50
     for idx2 in temp:
         t.append(idx2)
 
-for idx in range(time_break2 + (gap*2) + skip, total_rt + skip, 5):
+for idx in range(time_break2 + (gap*2) + skip, total_rt, 5):
     temp = random.sample(ind_B1, 50)
     for idx2 in temp:
         ind2.append(idx2)
@@ -128,33 +132,33 @@ PG = SpikeGeneratorGroup(1000, indicies, times)
 
 #firing + neuron group---------------------------------------------------------
 S1 = Synapses(PG, n1, on_pre='gsyn += we*nsiemens')
-S1.connect(p = .2)
+S1.connect(p = .15)
 
 S2 = Synapses(PG, n2, on_pre='gsyn += we*nsiemens')
-S2.connect(p = .2)
+S2.connect(p = .15)
 
 S3 = Synapses(PG, n3, on_pre='gsyn += we*nsiemens')
-S3.connect(p = .2)
+S3.connect(p = .15)
 
 #neuron group + inhibitory-----------------------------------------------------
 S4 = Synapses(n1, I, on_pre='gsyn += we*nsiemens')
-S4.connect(p = .2)
+S4.connect(p = .21)
 
 S5 = Synapses(n2, I, on_pre='gsyn += we*nsiemens')
-S5.connect(p = .1)
+S5.connect(p = .11)
 
 #S6 = Synapses(n3, I, on_pre='gsyn += wa*nsiemens')
 #S6.connect(p = .1)
 
 #inhibitoty + neuron group-----------------------------------------------------
-S4 = Synapses(n1, I, on_pre='esyn += wa*nsiemens')
-S4.connect(p = .2)
+S7 = Synapses(I, n1, on_pre='esyn += wa*nsiemens')
+S7.connect(p = .21)
 
-S4 = Synapses(n1, I, on_pre='esyn += wa*nsiemens')
-S4.connect(p = .1)
+S8 = Synapses(I, n2, on_pre='esyn += wa*nsiemens')
+S8.connect(p = .11)
 
-#S4 = Synapses(n1, I, on_pre='esyn += wa*nsiemens')
-#S4.connect(p = .1)
+#S9 = Synapses(I, n3, on_pre='esyn += wa*nsiemens')
+#S9.connect(p = .1)
 
 #spikemonitor------------------------------------------------------------------
 M1 = SpikeMonitor(n1)
@@ -230,13 +234,59 @@ def sort_spikes(M, n):
     
 
     for i, t in itertools.zip_longest(M.i, M.t):
-        if t < time_break1*ms:
+        if t < (time_break1 + gap + skip)*ms:
             list_A1[i] += 1.0
-        elif t >= time_break2*ms:
+        elif t >= (time_break2 + (gap*2) + skip)*ms:
             list_B1[i] += 1.0
         else:
             list_A2[i] += 1.0
+            
         
+    total_A1 = sum(list_A1)
+
+    percent_A1 = []
+
+    for a1 in list_A1:
+        percent_A1.append(a1/total_A1)
+
+    occur_A2 = []
+    occur_B1 = []
+
+    for l_a2, l_b1, p_a1 in zip(list_A2, list_B1, percent_A1):
+        occur_A2.append(l_a2 * p_a1)
+        occur_B1.append(l_b1 * p_a1)        
+        
+    print('--------For Neuron Group: %d--------' %n)
+    print('A1-A2: %.2f' %sum(occur_A2))
+    print('A1-B1: %.2f' %sum(occur_B1))
+    print('List_A1 total: %d' %sum(list_A1))
+    print('List_A2 total: %d' %sum(list_A2))
+    print('List_B1 total: %d' %sum(list_B1))
+   
+
+sort_spikes(M1, 1)
+sort_spikes(M2, 2)
+sort_spikes(M3, 3)
+
+#SSE===========================================================================
+def sum_square_err(M, n):
+    list_A1 = []
+    list_A2 = []
+    list_B1 = []
+
+    for i in range(0, 300):
+        list_A1.append(0.0)
+        list_A2.append(0.0)
+        list_B1.append(0.0)
+    
+    for i, t in itertools.zip_longest(M.i, M.t):
+        if t < (time_break1 + gap + skip)*ms:
+            list_A1[i] += 1.0
+        elif t >= (time_break2 + (gap*2) + skip)*ms:
+            list_B1[i] += 1.0
+        else:
+            list_A2[i] += 1.0
+    
     total_A1 = sum(list_A1)
     total_A2 = sum(list_A2)
     total_B1 = sum(list_B1)
@@ -249,38 +299,20 @@ def sort_spikes(M, n):
         percent_A1.append(a1/total_A1)
         percent_A2.append(a2/total_A2)
         percent_B1.append(b1/total_B1)
-
-    occur_A1 = []
-    occur_A2 = []
-    occur_B1 = []
-
-    for l_a1, l_a2, l_b1, p_a1, p_a2, p_b1 in zip(list_A1, list_A2, list_B1, percent_A1, percent_A2, percent_B1):
-        occur_A1.append(l_a1 * p_a1)
-        occur_A2.append(l_a2 * p_a2)
-        occur_B1.append(l_b1 * p_b1)
-    
-#==============================================================================
-#     sum_A1 = 0.0
-#     sum_A2 = 0.0
-#     sum_B1 = 0.0
-#     
-#     for o_a1, o_a2, o_b1 in itertools.zip_longest(occur_A1, occur_A2, occur_B1):
-#         sum_A1 += o_a1
-#         sum_A2 += o_a2
-#         sum_B1 += o_b1
-#==============================================================================
         
+    SSE_A2 = []
+    SSE_B1 = []
+    
+    for p_a1, p_a2, p_b1 in zip(percent_A1, percent_A2, percent_B1):
+        SSE_A2.append((p_a1 - p_a2)**2)
+        SSE_B1.append((p_a1 - p_b1)**2)
         
     print('--------For Neuron Group: %d--------' %n)
-    print('A1 total: %d' %sum(occur_A1))
-    print('A2 total: %d' %sum(occur_A2))
-    print('B1 total: %d' %sum(occur_B1))
-   
-
-sort_spikes(M1, 1)
-sort_spikes(M2, 2)
-sort_spikes(M3, 3)
-
-
-
+    print('SSE A1-A2: %.2f' %sum(SSE_A2))
+    print('SSE A1-B1: %.2f' %sum(SSE_B1))
+    
+sum_square_err(M1, 1) 
+sum_square_err(M2, 2) 
+sum_square_err(M3, 3) 
+    
 show()
