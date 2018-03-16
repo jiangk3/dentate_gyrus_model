@@ -5,13 +5,6 @@ Created on Thu Mar  8 13:33:27 2018
 @author: Imaris
 """
 
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Feb  6 11:15:26 2018
-
-@author: Imaris
-"""
-
 from brian2 import *
 import numpy
 import random 
@@ -45,7 +38,16 @@ beta_h = 1./(exp(-0.1/mV*(v+28*mV))+1)/ms : Hz
 dn/dt = 5*(alpha_n*(1-n)-beta_n*n) : 1
 alpha_n = -0.01/mV*(v+34*mV)/(exp(-0.1/mV*(v+34*mV))-1)/ms : Hz
 beta_n = 0.125*exp(-(v+44*mV)/(80*mV))/ms : Hz
+
+Igap : 1 # gap junction current
 '''
+#dv/dt = (v0 - v + Igap) / tau : 1
+#don't know what to do with this. Found gapjunction code on brian 2
+#when i run with it in eqs, I get two declarations of V
+#without it, nothing fires. 
+#so......???
+#oh and in neuron connection section, idk if I should set w as something else.
+
 #choose a multiple of 3 please.
 rt = 300
 gap = 10 #2 gaps
@@ -59,18 +61,22 @@ n1 = NeuronGroup(300, eqs, threshold = 'v > -40*mV', refractory = 'v >= -40*mV',
 n1.v = -80*mV
 n1.h = 1
 
-n2 = NeuronGroup(300, eqs, threshold = 'v > -40*mV', refractory = 'v >= -40*mV', method='exponential_euler')
+n2 = NeuronGroup(300, eqs, threshold = 'v > -40*mV', refractory = 'v >= -40*mV',method='exponential_euler')
 n2.v = -80*mV
 n2.h = 1
 
-n3 = NeuronGroup(300, eqs, threshold = 'v > -40*mV', refractory = 'v >= -40*mV', method='exponential_euler')
+n3 = NeuronGroup(300, eqs, threshold = 'v > -40*mV', refractory = 'v >= -40*mV',method='exponential_euler')
 n3.v = -80*mV
 n3.h = 1
 
 #inhibitory group--------------------------------------------------------------
 I = NeuronGroup(100, eqs, threshold = 'v > -40*mV', refractory = 'v >= -40*mV',method='exponential_euler')
 wa = (2000)#inhibitory
-we = (2500)#excitatory
+we = (2000)#excitatory
+we_2 = (we/200)#weak connection between neurons
+print('wa: %d' %wa)
+print('we: %d' %we)
+print('we_2: %d' %we_2)
 #firing------------------------------------------------------------------------
 #next time: change this to spike generator group. 1000, choose 300, each time, randomly choose 50 of 300 to fire every 5 ms.
 #PG = PoissonGroup(1000, 1*Hz)
@@ -79,8 +85,7 @@ we = (2500)#excitatory
 time_break1 = int((rt)/3)
 time_break2 = time_break1 * 2
 #------------------------------A1----------------------------------------------
-#ind = list(random.sample(range(0, 1000), 100))
-ind = list(range(0,100))
+ind = list(random.sample(range(0, 1000), 100))
 
 
 t = []
@@ -111,8 +116,7 @@ for idx in range(time_break1 + gap + skip, time_break2 + gap + skip, 5):
         
 #print('ind2: %s' %len(ind2))
 #------------------------------B1----------------------------------------------
-#ind_B1 = list(random.sample(range(0, 1000), 100))
-ind_B1 = list(range(200,300))
+ind_B1 = list(random.sample(range(0, 1000), 100))
 
 
 for idx in range(time_break2 + (gap*2) + skip, total_rt, 5):
@@ -125,30 +129,48 @@ for idx in range(time_break2 + (gap*2) + skip, total_rt, 5):
     for idx2 in temp:
         ind2.append(idx2)
 
-
 #print('ind3: %s' %len(ind2))
 #print('time3: %s' %len(t))
 #print('ind: %s' %ind2)
 #print('time: %s' %t)
 
-
 indicies = numpy.array(ind2)
 times = numpy.array(t) * ms
 PG = SpikeGeneratorGroup(1000, indicies, times) 
+
 #==============================================================================
 
 #firing + neuron group---------------------------------------------------------
 S1 = Synapses(PG, n1, on_pre='gsyn += we*nsiemens')
 S1.connect(p = .15)
-S1.connect(j='i+(-1)**k for k in range(2) if i>0 and i<298')
 
 S2 = Synapses(PG, n2, on_pre='gsyn += we*nsiemens')
 S2.connect(p = .15)
-S2.connect(j='i+(-1)**k for k in range(2) if i>0 and i<298')
 
 S3 = Synapses(PG, n3, on_pre='gsyn += we*nsiemens')
 S3.connect(p = .15)
-S3.connect(j='i+(-1)**k for k in range(2) if i>0 and i<298')
+
+#neuron connections------------------------------------------------------------
+S11 = Synapses(n1, n1, '''
+             w : 1 # gap junction conductance
+             Igap_post = w * (v_pre - v_post) : 1 (summed)
+             ''')
+S11.connect(j='i+(-1)**k for k in range(2) if i>0 and i<298')
+S11.w = .02
+
+S12 = Synapses(n2, n2, '''
+             w : 1 # gap junction conductance
+             Igap_post = w * (v_pre - v_post) : 1 (summed)
+             ''')
+S12.connect(j='i+(-1)**k for k in range(2) if i>0 and i<298')
+S12.w = .02
+
+S13 = Synapses(n3, n3, '''
+             w : 1 # gap junction conductance
+             Igap_post = w * (v_pre - v_post) : 1 (summed)
+             ''')
+S13.connect(j='i+(-1)**k for k in range(2) if i>0 and i<298')
+S13.w = .02
 
 #neuron group + inhibitory-----------------------------------------------------
 S4 = Synapses(n1, I, on_pre='gsyn += we*nsiemens')
@@ -200,6 +222,7 @@ plt.plot(M3.t/ms, M3.i, '.k')
 plt.show
 xlabel('Time (ms)')
 ylabel('Neuron index')
+
 #==============================================================================
 #prints out the total neurons fired in a group, average firing rate of each neuron in the group, and standard deviation.
 def neuro_spike_info(M, n):
@@ -230,6 +253,7 @@ def neuro_spike_info(M, n):
 neuro_spike_info(M1, 1)
 neuro_spike_info(M2, 2)
 neuro_spike_info(M3, 3)
+
 #==============================================================================
 def sort_spikes(M, n):
 
@@ -242,7 +266,6 @@ def sort_spikes(M, n):
         list_A2.append(0.0)
         list_B1.append(0.0)
     
-
     for i, t in itertools.zip_longest(M.i, M.t):
         if t < (time_break1 + gap + skip)*ms:
             list_A1[i] += 1.0
@@ -250,8 +273,7 @@ def sort_spikes(M, n):
             list_B1[i] += 1.0
         else:
             list_A2[i] += 1.0
-            
-        
+                   
     total_A1 = sum(list_A1)
 
     percent_A1 = []
@@ -273,7 +295,6 @@ def sort_spikes(M, n):
     print('List_A2 total: %d' %sum(list_A2))
     print('List_B1 total: %d' %sum(list_B1))
    
-
 sort_spikes(M1, 1)
 sort_spikes(M2, 2)
 sort_spikes(M3, 3)
