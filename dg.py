@@ -42,7 +42,7 @@ beta_n = 0.125*exp(-(v+44*mV)/(80*mV))/ms : Hz
 #choose a multiple of 3 please.
 rt = 300
 gap = 10 #2 gaps
-skip = 200
+skip = 100
 total_rt = rt + (gap*2) + skip
 #Experiment: all in one run: A1 - 1000, choose 300, every 5/50? ms diff group of 50 fire.
 #                            A2 -       same 300 "                                      "
@@ -63,7 +63,7 @@ n3.h = 1
 #inhibitory group--------------------------------------------------------------
 I = NeuronGroup(100, eqs, threshold = 'v > -40*mV', refractory = 'v >= -40*mV',method='exponential_euler')
 wa = (2000)#inhibitory
-we = (2500)#excitatory
+we = (2400)#excitatory
 #firing------------------------------------------------------------------------
 #next time: change this to spike generator group. 1000, choose 300, each time, randomly choose 50 of 300 to fire every 5 ms.
 #PG = PoissonGroup(1000, 1*Hz)
@@ -73,7 +73,6 @@ time_break1 = int((rt)/3)
 time_break2 = time_break1 * 2
 #------------------------------A1----------------------------------------------
 ind = list(random.sample(range(0, 1000), 100))
-#ind = list(range(0,100))
 
 
 t = []
@@ -105,7 +104,7 @@ for idx in range(time_break1 + gap + skip, time_break2 + gap + skip, 5):
 #print('ind2: %s' %len(ind2))
 #------------------------------B1----------------------------------------------
 ind_B1 = list(random.sample(range(0, 1000), 100))
-#ind_B1 = list(range(200,300))
+
 
 
 for idx in range(time_break2 + (gap*2) + skip, total_rt, 5):
@@ -118,12 +117,10 @@ for idx in range(time_break2 + (gap*2) + skip, total_rt, 5):
     for idx2 in temp:
         ind2.append(idx2)
 
-
 #print('ind3: %s' %len(ind2))
 #print('time3: %s' %len(t))
 #print('ind: %s' %ind2)
 #print('time: %s' %t)
-
 
 indicies = numpy.array(ind2)
 times = numpy.array(t) * ms
@@ -314,5 +311,5 @@ def sum_square_err(M, n):
 sum_square_err(M1, 1) 
 sum_square_err(M2, 2) 
 sum_square_err(M3, 3) 
-    
+
 show()
